@@ -1,0 +1,34 @@
+1. Home, login, register, logout route create
+2. add authentication, home page should be route protected. 
+3. note CRUD api crate. it should be row protected. check note user/shared user before sending response.
+3.1 share note with other user..it can be view only, or can edit the note.
+3.2. add color to note. 
+4. add files to a notes...the files can be previewd.
+
+5. create category CRUD/ add color to categoyr
+5. add category to note
+7. search notes by title, and category
+
+
+
+dxf4EVMs9aVjaNUt
+localhost:5000/api/auth/register
+
+/ login
+email, pasword, 
+email -> user find 
+password -> user find (password)
+use login-> token geneate
+
+/ logout 
+token -> token user _id
+user id er token invalid
+cookie invalid
+
+notest
+GET /api/notes -> get all notes (withpagination)
+POST /api/notes -> crate
+PUT /api/notes/{id} -> update the note
+Delete /api/notes/{id} -> Delete a note
+
+

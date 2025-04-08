@@ -157,3 +157,169 @@ exports.logout = async (req, res) => {
     });
   }
 };
+
+exports.getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        errors: {
+          server: "User not found",
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error("Get user error:", error);
+    res.status(500).json({
+      success: false,
+      errors: {
+        server: "Error fetching user data",
+      },
+    });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    const user = await User.findById(req.user.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        errors: {
+          server: "User not found",
+        },
+      });
+    }
+
+    // Verify old password
+    const isValidPassword = await bcrypt.compare(oldPassword, user.password);
+    if (!isValidPassword) {
+      return res.status(400).json({
+        success: false,
+        errors: {
+          oldPassword: "Incorrect password",
+        },
+      });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({
+      success: false,
+      errors: {
+        server: "Error resetting password",
+      },
+    });
+  }
+};
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpiry = Date.now() + 3600000; // 1 hour
+
+    if (user) {
+      // Save reset token to user
+      user.resetPasswordToken = resetToken;
+      user.resetPasswordExpires = resetTokenExpiry;
+      await user.save();
+
+      // Create reset URL
+      const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+      // Send email
+      await sendEmail({
+        to: user.email,
+        subject: "Password Reset Request",
+        text: `You requested a password reset. Please go to this link to reset your password: ${resetUrl}`,
+        html: `
+          <p>You requested a password reset.</p>
+          <p>Click <a href="${resetUrl}">here</a> to reset your password</p>
+          <p>If you didn't request this, please ignore this email.</p>
+        `,
+      });
+    }
+
+    // Always send success response for security
+    res.json({
+      success: true,
+      message:
+        "If an account exists with this email, you will receive password reset instructions.",
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({
+      success: false,
+      errors: {
+        server: "Error processing request",
+      },
+    });
+  }
+};
+
+exports.resetPasswordWithToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        errors: {
+          token: "Invalid or expired reset token",
+        },
+      });
+    }
+
+    // Update password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Password has been reset successfully",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({
+      success: false,
+      errors: {
+        server: "Error resetting password",
+      },
+    });
+  }
+};

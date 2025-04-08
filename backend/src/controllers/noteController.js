@@ -652,3 +652,51 @@ exports.addCategory = async (req, res) => {
     });
   }
 };
+
+exports.getNotes = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 9;
+    const categoryId = req.query.category;
+
+    const query = { user_id: req.user.userId };
+
+    // Add category filter if provided
+    if (categoryId) {
+      query.categories = categoryId;
+    }
+
+    const [notes, total] = await Promise.all([
+      Note.find(query)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate("categories", "name color")
+        .populate("author", "username")
+        .populate("sharedWith.user", "username"),
+      Note.countDocuments(query),
+    ]);
+
+    res.json({
+      success: true,
+      message: "Notes retrieved successfully",
+      notes,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
+        totalNotes: total,
+        limit,
+        hasNextPage: page * limit < total,
+        hasPrevPage: page > 1,
+      },
+    });
+  } catch (error) {
+    console.error("Get notes error:", error);
+    res.status(500).json({
+      success: false,
+      errors: {
+        server: "Error retrieving notes",
+      },
+    });
+  }
+};

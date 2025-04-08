@@ -6,8 +6,7 @@ const auth = require("../middleware/auth");
 const validateRequest = require("../middleware/validateRequest");
 
 const searchValidation = [
-  query("title").optional().trim(),
-  query("body").optional().trim(),
+  query("query").optional().trim(),
   query("color")
     .optional()
     .matches(/^#?([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/)

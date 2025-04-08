@@ -31,7 +31,7 @@ mongoose
 
 // Routes
 app.use("/api/auth", authRoutes);
-app.use("/", homeRoutes);
+app.use("/api", homeRoutes);
 app.use("/api/notes", noteRoutes);
 app.use("/api/categories", categoryRoutes);
 

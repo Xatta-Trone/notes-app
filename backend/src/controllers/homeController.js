@@ -10,9 +10,12 @@ exports.getHomeData = async (req, res) => {
     const limit = parseInt(req.query.limit) || 12;
     const skip = (page - 1) * limit;
 
-    // Build search query
+    // Build search query for both owned and shared notes
     let searchQuery = {
-      $or: [{ user_id: userId }, { "sharedWith.user": userId }],
+      $or: [
+        { user_id: userId },
+        { "shared.id": userId }, // Updated to match new shared structure
+      ],
     };
 
     // Add text search for title and body
@@ -35,25 +38,18 @@ exports.getHomeData = async (req, res) => {
       });
     }
 
-    // Add categories search
-    if (req.query.categories) {
+    // Add category search - updated for single category selection
+    if (req.query.category && req.query.category !== "all") {
       if (!searchQuery.$and) searchQuery.$and = [];
       searchQuery.$and.push({
-        categories: {
-          $all: Array.isArray(req.query.categories)
-            ? req.query.categories
-            : [req.query.categories],
-        },
+        categories: req.query.category // Single category ID
       });
     }
 
     const notes = await Note.find(searchQuery)
       .populate("user_id", "username email")
-      .populate("sharedWith.user", "username email")
       .populate("categories", "name color")
-      .select(
-        "title body color createdAt updatedAt user_id sharedWith categories"
-      )
+      .select("title body color createdAt updatedAt user_id shared categories attachments") // Added attachments
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -67,33 +63,30 @@ exports.getHomeData = async (req, res) => {
       title: note.title,
       body: note.body,
       color: `#${note.color || "ffffff"}`,
-      categories: note.categories.map((category) => ({
-        id: category._id,
-        name: category.name,
-        color: `#${category.color || "ffffff"}`,
-      })),
+      categories: note.categories?.map((category) => ({
+        id: category?._id,
+        name: category?.name,
+        color: `#${category?.color || "ffffff"}`,
+      })) || [],
+      attachments: note.attachments?.map(attachment => ({
+        originalname: attachment.originalname,
+        size: attachment.size,
+        mimetype: attachment.mimetype,
+        filename: attachment.filename,
+        path: attachment.path
+      })) || [],
       createdAt: note.createdAt,
       updatedAt: note.updatedAt,
-      author: {
+      author: note.user_id ? {
         id: note.user_id._id,
         username: note.user_id.username,
-        email: note.user_id.email,
-      },
-      sharedWith: note.sharedWith.map((share) => ({
-        user: {
-          id: share.user._id,
-          username: share.user.username,
-          email: share.user.email,
-        },
-        permission: share.permission,
-      })),
-      isOwner: note.user_id._id.toString() === userId,
-      userPermission:
-        note.user_id._id.toString() === userId
-          ? "owner"
-          : note.sharedWith.find(
-              (share) => share.user._id.toString() === userId
-            )?.permission || "none",
+        email: note.user_id.email
+      } : null,
+      shared: note.shared || [],
+      isOwner: note.user_id?._id.toString() === userId,
+      userPermission: note.user_id?._id.toString() === userId
+        ? "owner"
+        : note.shared?.find((share) => share.id === userId)?.permission || "none"
     }));
 
     res.json({

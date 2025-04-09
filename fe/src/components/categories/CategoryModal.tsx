@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import api from "@/lib/axios";
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { AxiosError } from "axios";
+interface ApiErrorResponse {
+  errors?: {
+    name?: string;
+  };
+}
 
 const CATEGORY_COLORS = [
   "#1abc9c", // Turquoise
@@ -62,38 +69,31 @@ export default function CategoryModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null); // Reset error on new submission
+    setError(null);
 
     try {
-      const url = category
-        ? `${process.env.NEXT_PUBLIC_API_URL}/categories/${category.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/categories`;
-
-      const response = await fetch(url, {
-        method: category ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        if (data.errors?.name) {
-          setError(data.errors.name);
-          return;
-        }
-        throw new Error(data.message || `Failed to ${category ? "update" : "create"} category`);
+      if (category?.id) {
+        await api.put(`/categories/${category.id}`, formData);
+      } else {
+        await api.post("/categories", formData);
       }
 
-      toast.success(`Category ${category ? "updated" : "created"} successfully`);
+      toast.success(
+        `Category ${category ? "updated" : "created"} successfully`
+      );
       onSuccess();
       resetForm();
       onClose();
-    } catch (error) {
-      console.error(`${category ? "Update" : "Create"} category error:`, error);
+    } catch (err) {
+      console.error(`${category ? "Update" : "Create"} category error:`, err);
+      if (err instanceof AxiosError) {
+        const error = err as AxiosError<ApiErrorResponse>;
+
+        if (error.response?.data?.errors?.name) {
+          setError(error.response.data.errors.name);
+          return;
+        }
+      }
       toast.error(`Failed to ${category ? "update" : "create"} category`, {
         style: { background: "#dc2626", color: "white" },
       });
@@ -140,11 +140,7 @@ export default function CategoryModal({
               required
               className={error ? "border-red-500" : ""}
             />
-            {error && (
-              <p className="text-sm text-red-500">
-                {error}
-              </p>
-            )}
+            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
 
           <div className="space-y-2">
@@ -156,8 +152,8 @@ export default function CategoryModal({
                   type="button"
                   className={`w-8 h-8 rounded-full border-2 transition-all ${
                     formData.color === color
-                      ? 'border-black dark:border-white scale-110'
-                      : 'border-transparent hover:scale-105'
+                      ? "border-black dark:border-white scale-110"
+                      : "border-transparent hover:scale-105"
                   }`}
                   style={{ backgroundColor: color }}
                   onClick={() => setFormData({ ...formData, color: color })}

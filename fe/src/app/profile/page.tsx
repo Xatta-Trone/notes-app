@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import AppLayout from "@/components/layout/AppLayout";
+import api from "@/lib/axios";
 
 interface User {
   id: string;
@@ -50,12 +51,9 @@ export default function ProfilePage() {
 
   const fetchUserData = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
-        credentials: "include",
-      });
+      const { data } = await api.get('/auth/me');
 
-      const data = await response.json();
-      if (response.ok) {
+      if (data.success) {
         setUser(data.user);
       } else {
         toast.error("Failed to fetch user data", {
@@ -82,25 +80,13 @@ export default function ProfilePage() {
     }
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/reset-password`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            oldPassword: passwordFormData.oldPassword,
-            newPassword: passwordFormData.newPassword,
-            confirmPassword: passwordFormData.confirmPassword,
-          }),
-          credentials: "include",
-        }
-      );
+      const { data } = await api.post('/auth/reset-password', {
+        oldPassword: passwordFormData.oldPassword,
+        newPassword: passwordFormData.newPassword,
+        confirmPassword: passwordFormData.confirmPassword,
+      });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (data.success) {
         toast.success("Password updated successfully");
         setPasswordFormData({
           oldPassword: "",
@@ -129,8 +115,8 @@ export default function ProfilePage() {
   return (
     <AuthGuard>
       <AppLayout>
-        <div className="container mx-auto p-4">
-          <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center justify-center min-h-screen bg-gray-100">
+          <div className="max-w-2xl w-full space-y-6">
             {/* User Info Card */}
             <Card>
               <CardHeader>
@@ -172,7 +158,9 @@ export default function ProfilePage() {
                       className={errors.oldPassword ? "border-red-500" : ""}
                     />
                     {errors.oldPassword && (
-                      <p className="text-sm text-red-500">{errors.oldPassword}</p>
+                      <p className="text-sm text-red-500">
+                        {errors.oldPassword}
+                      </p>
                     )}
                   </div>
 
@@ -194,12 +182,16 @@ export default function ProfilePage() {
                       Password must be at least 6 characters long
                     </p>
                     {errors.newPassword && (
-                      <p className="text-sm text-red-500">{errors.newPassword}</p>
+                      <p className="text-sm text-red-500">
+                        {errors.newPassword}
+                      </p>
                     )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                    <Label htmlFor="confirmPassword">
+                      Confirm New Password
+                    </Label>
                     <Input
                       id="confirmPassword"
                       type="password"

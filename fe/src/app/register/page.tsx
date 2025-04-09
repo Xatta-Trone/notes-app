@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import api from "@/lib/axios";
 
 interface ServerErrors {
   email?: string;
@@ -56,25 +57,13 @@ export default function RegisterPage() {
     }
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: formData.username,
-            email: formData.email,
-            password: formData.password,
-          }),
-          credentials: "include",
-        }
-      );
+      const { data } = await api.post<ServerResponse>("/auth/register", {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+      });
 
-      const data: ServerResponse = await response.json();
-
-      if (response.ok) {
+      if (data.success) {
         toast.success("Registration successful! Please login.");
         router.push("/login");
       } else {
@@ -167,7 +156,9 @@ export default function RegisterPage() {
               />
             </div>
             {errors.server && (
-              <p className="text-sm text-red-500 text-center">{errors.server}</p>
+              <p className="text-sm text-red-500 text-center">
+                {errors.server}
+              </p>
             )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Creating account..." : "Register"}
@@ -177,14 +168,6 @@ export default function RegisterPage() {
                 Already have an account?{" "}
                 <Link href="/login" className="text-blue-500 hover:underline">
                   Login
-                </Link>
-              </p>
-              <p>
-                <Link
-                  href="/forgot-password"
-                  className="text-blue-500 hover:underline"
-                >
-                  Forgot your password?
                 </Link>
               </p>
             </div>

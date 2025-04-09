@@ -58,26 +58,57 @@ exports.getCategories = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const categories = await Category.find({ user_id: userId }).sort({
-      name: 1,
-    });
+    // Get notes shared with the user
+    const sharedNotes = await Note.find({
+      'shared.id': userId
+    }).populate('categories');
+
+    // Extract unique categories from shared notes
+    const sharedCategories = [...new Set(
+      sharedNotes.flatMap(note => 
+        note.categories.map(category => ({
+          id: category._id,
+          name: category.name,
+          color: `#${category.color}`,
+          createdAt: category.createdAt,
+          isShared: true
+        }))
+      )
+    )];
+
+    // Get user's own categories
+    const userCategories = await Category.find({ user_id: userId })
+      .sort({ name: 1 })
+      .lean()
+      .then(categories => 
+        categories.map(category => ({
+          id: category._id,
+          name: category.name,
+          color: `#${category.color}`,
+          createdAt: category.createdAt,
+          isShared: false
+        }))
+      );
+
+    // Combine and remove duplicates (if a category is both shared and owned)
+    const uniqueCategories = [
+      ...userCategories,
+      ...sharedCategories.filter(shared => 
+        !userCategories.some(user => user.id.toString() === shared.id.toString())
+      )
+    ].sort((a, b) => a.name.localeCompare(b.name));
 
     res.json({
       success: true,
-      categories: categories.map((category) => ({
-        id: category._id,
-        name: category.name,
-        color: `#${category.color}`,
-        createdAt: category.createdAt,
-      })),
+      categories: uniqueCategories
     });
   } catch (error) {
     console.error("Categories fetch error:", error);
     res.status(500).json({
       success: false,
       errors: {
-        server: "Error fetching categories",
-      },
+        server: "Error fetching categories"
+      }
     });
   }
 };

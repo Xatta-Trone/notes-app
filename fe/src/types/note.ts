@@ -10,6 +10,19 @@ export interface Category {
   color: string;
 }
 
+export interface SharedUser {
+  id: string;
+  username: string;
+  permission: "view" | "edit";
+}
+
+export interface Attachment {
+  filename: string;
+  originalname: string;
+  mimetype: string;
+  size: number;
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -18,10 +31,8 @@ export interface Note {
   isOwner: boolean;
   author: User;
   categories: Category[];
-  sharedWith: {
-    user: User;
-    permission: "view" | "edit";
-  }[];
+  shared: SharedUser[];
+  attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
 }

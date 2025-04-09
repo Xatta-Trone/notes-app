@@ -1,5 +1,29 @@
 const mongoose = require("mongoose");
 
+const sharedSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    required: true,
+  },
+  username: {
+    type: String,
+    required: true,
+  },
+  permission: {
+    type: String,
+    enum: ["view", "edit"],
+    default: "view",
+  },
+});
+
+const attachmentSchema = new mongoose.Schema({
+  filename: String,
+  originalname: String,
+  mimetype: String,
+  size: Number,
+  path: String,
+});
+
 const noteSchema = new mongoose.Schema(
   {
     title: {
@@ -16,19 +40,7 @@ const noteSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    sharedWith: [
-      {
-        user: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-        permission: {
-          type: String,
-          enum: ["view", "edit"],
-          default: "view",
-        },
-      },
-    ],
+    shared: [sharedSchema],
     color: {
       type: String,
       default: "ffffff", // Default white color without #
@@ -39,31 +51,7 @@ const noteSchema = new mongoose.Schema(
         message: "Color must be a valid hex color code without #",
       },
     },
-    attachments: [
-      {
-        filename: {
-          type: String,
-          required: true,
-        },
-        originalname: {
-          type: String,
-          required: true,
-        },
-        mimetype: {
-          type: String,
-          required: true,
-        },
-        size: {
-          type: Number,
-          required: true,
-          max: 1024 * 1024, // 1MB
-        },
-        path: {
-          type: String,
-          required: true,
-        },
-      },
-    ],
+    attachments: [attachmentSchema],
     categories: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -78,6 +66,6 @@ const noteSchema = new mongoose.Schema(
 
 // Add index for better query performance
 noteSchema.index({ user_id: 1, title: 1 });
-noteSchema.index({ sharedWith: 1 });
+noteSchema.index({ shared: 1 });
 
 module.exports = mongoose.model("Note", noteSchema);

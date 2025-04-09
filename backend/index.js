@@ -11,6 +11,7 @@ const authRoutes = require("./src/routes/authRoutes");
 const homeRoutes = require("./src/routes/homeRoutes");
 const noteRoutes = require("./src/routes/noteRoutes");
 const categoryRoutes = require("./src/routes/categoryRoutes");
+const userRoutes = require("./src/routes/userRoutes");
 
 const app = express();
 
@@ -24,6 +25,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Database connection
+let dbConnect = false;
+mongoose.connection.on("connected", () => {
+  dbConnect = true;
+});
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log("Connected to MongoDB"))
@@ -34,6 +39,14 @@ app.use("/api/auth", authRoutes);
 app.use("/api", homeRoutes);
 app.use("/api/notes", noteRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/users", userRoutes);
+
+app.use("/", (req, res) => {
+  res.json({
+    success: true,
+    message: `Welcome to the Note App API. Database connected: ${dbConnect} `,
+  });
+});
 
 // Error handling
 app.use((req, res) => {

@@ -9,8 +9,9 @@ import { toast } from "sonner";
 import type { Note } from "@/types/note";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, FileText, Download } from "lucide-react";
 import EditNoteModal from "./EditNoteModal";
+import api from "@/lib/axios";
 
 interface NoteDetailsModalProps {
   note: Note | null;
@@ -27,23 +28,12 @@ export default function NoteDetailsModal({
   const [loading, setLoading] = useState(false);
 
   const handleDelete = async () => {
-    if (!note) return; // Add null check
+    if (!note) return;
     if (!confirm("Are you sure you want to delete this note?")) return;
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/notes/${note.id}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to delete note");
-      }
-
+      await api.delete(`/notes/${note.id}`);
       toast.success("Note deleted successfully");
       onClose();
     } catch (error) {
@@ -58,8 +48,8 @@ export default function NoteDetailsModal({
 
   const formatDate = (date: string) => {
     const d = new Date(date);
-    const formattedDate = format(d, 'dd-MMM-yyyy').toLowerCase();
-    const time = format(d, 'HH:mm');
+    const formattedDate = format(d, "dd-MMM-yyyy").toLowerCase();
+    const time = format(d, "HH:mm");
     const distance = formatDistanceToNow(d, { addSuffix: true });
     return `${formattedDate} at ${time} (${distance})`;
   };
@@ -69,10 +59,15 @@ export default function NoteDetailsModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-[90vw] max-h-[85vh] w-full">
-          <DialogHeader className="pb-2 relative">
+        <DialogContent
+          className="max-w-[90vw] max-h-[85vh] w-full rounded-xl overflow-hidden shadow-lg"
+         
+        >
+          <DialogHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <DialogTitle className="text-xl font-bold">{note.title}</DialogTitle>
+              <DialogTitle className="text-xl font-bold">
+                {note.title}
+              </DialogTitle>
               {note.isOwner && (
                 <div className="flex items-center gap-2">
                   <Button
@@ -101,14 +96,16 @@ export default function NoteDetailsModal({
                 </div>
               )}
             </div>
-            <div 
-              className="absolute bottom-0 left-0 right-0 h-[2px]" 
-              style={{ backgroundColor: note.color }}
-            />
           </DialogHeader>
-            
-          <div className="overflow-y-auto max-h-[calc(85vh-8rem)]">
-            <div className="space-y-6 p-4">
+
+          <div className="overflow-y-auto max-h-[calc(85vh-8rem)] p-1">
+            <div 
+              className="space-y-6 p-4 rounded-lg"
+              style={{
+                border: `2px solid ${note.color}30`,
+                backgroundColor: `${note.color}05`
+              }}
+            >
               {/* Note Content */}
               <div className="prose dark:prose-invert max-w-none">
                 <p className="whitespace-pre-wrap text-base leading-relaxed">
@@ -119,20 +116,53 @@ export default function NoteDetailsModal({
               {/* Categories */}
               {note.categories.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium text-muted-foreground">Categories</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Categories
+                  </h3>
                   <div className="flex flex-wrap gap-2">
                     {note.categories.map((category) => (
                       <div
                         key={category.id}
                         className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                        style={{ 
+                        style={{
                           backgroundColor: `${category.color}15`,
                           color: category.color,
-                          border: `1px solid ${category.color}30`
+                          border: `1px solid ${category.color}30`,
                         }}
                       >
                         {category.name}
                       </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Attachments */}
+              {note.attachments && note.attachments.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    Attachments ({note.attachments.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {note.attachments.map((file) => (
+                      <a
+                        key={file.filename}
+                        href={`${process.env.NEXT_PUBLIC_API_URL}/uploads/${note.author.id}/${file.filename}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 rounded-md hover:bg-secondary/50 transition-colors group"
+                      >
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {file.originalname}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {Math.round(file.size / 1024)}KB
+                          </p>
+                        </div>
+                        <Download className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -143,7 +173,9 @@ export default function NoteDetailsModal({
                 <div className="flex items-center justify-between">
                   <span>Created by</span>
                   <span className="font-medium">
-                    {note.author.username}
+                    {note.author.id === JSON.parse(localStorage.getItem("user") || "{}")?.id 
+                      ? "you" 
+                      : note.author.username}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -156,18 +188,18 @@ export default function NoteDetailsModal({
                     <span>{formatDate(note.updatedAt)}</span>
                   </div>
                 )}
-                
+
                 {/* Sharing Information */}
-                {note.sharedWith.length > 0 && (
+                {note.shared && note.shared.length > 0 && (
                   <div className="pt-2 space-y-2">
                     <h3 className="font-medium">Shared with</h3>
                     <div className="space-y-1 ml-4">
-                      {note.sharedWith.map((share) => (
-                        <div 
-                          key={share.user.id}
+                      {note.shared.map((share) => (
+                        <div
+                          key={share.id}
                           className="flex items-center justify-between text-xs"
                         >
-                          <span>{share.user.username}</span>
+                          <span>{share.username}</span>
                           <span className="px-2 py-0.5 bg-secondary rounded-full">
                             {share.permission}
                           </span>

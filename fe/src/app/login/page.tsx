@@ -14,6 +14,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import api from "@/lib/axios";
+import { AxiosError } from "axios";
 
 interface ServerErrors {
   email?: string;
@@ -50,48 +52,42 @@ export default function LoginPage() {
     setErrors({});
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: formData.emailOrUsername, // Send as 'email' to match backend
-            password: formData.password,
-          }),
-          credentials: "include", // Important for receiving cookies
-        }
-      );
+      const { data } = await api.post<ServerResponse>('/auth/login', {
+        email: formData.emailOrUsername,
+        password: formData.password,
+      });
 
-      const data: ServerResponse = await response.json();
-
-      if (response.ok && data.success) {
-        // Store token and user data
-        if (data.token) {
-          localStorage.setItem("token", data.token);
-        }
-        if (data.user) {
-          localStorage.setItem("user", JSON.stringify(data.user));
-        }
-        toast.success(data.message || "Login successful!");
-        router.push("/"); // Changed from /dashboard to /
-      } else {
-        setErrors(data.errors || {});
+      if (!data.success) {
         if (data.errors) {
+          setErrors(data.errors);
           const firstError = Object.values(data.errors)[0];
           toast.error(firstError, {
             style: { background: "#dc2626", color: "white" },
           });
         }
+        return;
       }
+
+      // Store token and user data
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
+      if (data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
+
+      toast.success(data.message || "Login successful!");
+      router.push("/");
     } catch (err) {
       console.error("Login error:", err);
-      setErrors({ server: "Server error. Please try again later." });
-      toast.error("Server error. Please try again later.", {
-        style: { background: "#dc2626", color: "white" },
-      });
+      if (err instanceof AxiosError) {
+        const error = err as AxiosError<ServerResponse>;
+        
+        setErrors({ server: "Server error. Please try again later." });
+        toast.error(error.response?.data?.message || "Server error. Please try again later.", {
+          style: { background: "#dc2626", color: "white" },
+        });
+      }
     } finally {
       setLoading(false);
     }

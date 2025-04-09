@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, User, Tag } from "lucide-react";
+import api from "@/lib/axios";
+import { AxiosError } from "axios";
+import type { ApiErrorResponse } from "@/types/api";
 
 export default function Sidebar() {
   const router = useRouter();
@@ -13,20 +16,22 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        toast.success("Logged out successfully");
-        router.push("/login");
+      await api.post('/auth/logout');
+      
+      // Clear local storage
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      
+      toast.success("Logged out successfully");
+      router.push("/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+      if (err instanceof AxiosError) {
+        const error = err as AxiosError<ApiErrorResponse>;
+        toast.error(error.response?.data?.message || "Failed to logout", {
+          style: { background: "#dc2626", color: "white" }
+        });
       }
-    } catch (error) {
-      console.error("Logout error:", error);
-      toast.error("Error logging out");
     }
   };
 

@@ -8,12 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import CategoryModal from "@/components/categories/CategoryModal";
+import api from "@/lib/axios";
+import { AxiosError } from "axios";
+import type { ApiErrorResponse } from "@/types/api";
 
 interface Category {
   id: string;
   name: string;
   color: string;
   createdAt: string;
+  isShared: boolean;
 }
 
 export default function CategoriesPage() {
@@ -28,24 +32,16 @@ export default function CategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/categories`,
-        {
-          credentials: "include",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch categories");
-      }
-
-      const data = await response.json();
+      const { data } = await api.get('/categories');
       setCategories(data.categories);
-    } catch (error) {
-      console.error("Fetch categories error:", error);
-      toast.error("Failed to load categories", {
-        style: { background: "#dc2626", color: "white" },
-      });
+    } catch (err) {
+      console.error("Fetch categories error:", err);
+      if (err instanceof AxiosError) {
+        const error = err as AxiosError<ApiErrorResponse>;
+        toast.error(error.response?.data?.message || "Failed to load categories", {
+          style: { background: "#dc2626", color: "white" }
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -55,25 +51,17 @@ export default function CategoriesPage() {
     if (!confirm("Are you sure you want to delete this category?")) return;
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/categories/${id}`,
-        {
-          method: "DELETE",
-          credentials: "include",
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to delete category");
-      }
-
+      await api.delete(`/categories/${id}`);
       toast.success("Category deleted successfully");
       fetchCategories();
-    } catch (error) {
-      console.error("Delete category error:", error);
-      toast.error("Failed to delete category", {
-        style: { background: "#dc2626", color: "white" },
-      });
+    } catch (err) {
+      console.error("Delete category error:", err);
+      if (err instanceof AxiosError) {
+        const error = err as AxiosError<ApiErrorResponse>;
+        toast.error(error.response?.data?.message || "Failed to delete category", {
+          style: { background: "#dc2626", color: "white" }
+        });
+      }
     }
   };
 
@@ -114,27 +102,36 @@ export default function CategoriesPage() {
                         className="w-4 h-4 rounded-full"
                         style={{ backgroundColor: category.color }}
                       />
-                      <h3 className="font-medium capitalize">
-                        {category.name}
-                      </h3>
+                      <div>
+                        <h3 className="font-medium capitalize">
+                          {category.name}
+                        </h3>
+                        {category.isShared && (
+                          <span className="text-xs text-muted-foreground">
+                            Shared category
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedCategory(category)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(category.id)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {!category.isShared && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setSelectedCategory(category)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(category.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               ))}
@@ -142,7 +139,7 @@ export default function CategoriesPage() {
           )}
         </div>
         <CategoryModal
-          category={selectedCategory || undefined}
+          category={selectedCategory}
           isOpen={showCreateModal || !!selectedCategory}
           onClose={() => {
             setShowCreateModal(false);

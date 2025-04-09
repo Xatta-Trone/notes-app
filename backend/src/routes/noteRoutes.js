@@ -11,11 +11,12 @@ const {
   addAttachment,
   removeAttachment,
   removeCategory,
-  addCategory, // Add this import
+  addCategory,
+  deleteAttachment,
 } = require("../controllers/noteController");
 const auth = require("../middleware/auth");
 const validateRequest = require("../middleware/validateRequest");
-const upload = require("../middleware/upload");
+const upload = require("../utils/fileUpload"); // Updated import
 
 // Validation rules for note creation
 const createNoteValidation = [
@@ -133,10 +134,15 @@ const addCategoryValidation = [
 ];
 
 // Create note route
-router.post("/", auth, createNoteValidation, validateRequest, createNote);
+router.post(
+  "/",
+  auth,
+  upload.array("attachments", 5), // Allow up to 5 files
+  createNote
+);
 
 // Update note route
-router.put("/:id", auth, updateNoteValidation, validateRequest, updateNote);
+router.put("/:id", auth, upload.array("attachments"), updateNote);
 
 // Delete note route
 router.delete("/:id", auth, deleteNote);
@@ -182,5 +188,8 @@ router.post(
   validateRequest,
   addCategory
 );
+
+// Add the new route for deleting attachment by filename
+router.delete("/:noteId/attachments/:filename", auth, deleteAttachment);
 
 module.exports = router;

@@ -5,42 +5,80 @@ const path = require("path");
 
 exports.createNote = async (req, res) => {
   try {
-    const { title, body, color, categories } = req.body;
+    // Parse JSON strings from FormData
+    const title = req.body.title;
+    const body = req.body.body;
+    const color = req.body.color;
+    const categories = JSON.parse(req.body.categories || "[]");
+    const shared = JSON.parse(req.body.shared || "[]");
+    const files = req.files;
 
-    // Remove # if present in color
     const formattedColor = color ? color.replace("#", "") : "ffffff";
+
+    // Format shared users
+    const validatedShared = shared
+      .filter((share) => share.id !== req.user.userId)
+      .map((share) => ({
+        id: share.id,
+        username: share.username,
+        permission: share.permission,
+      }));
+
+    // Format attachments
+    const attachments =
+      files?.map((file) => ({
+        filename: file.filename,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        path: file.path,
+      })) || [];
 
     const note = new Note({
       title,
       body,
       color: formattedColor,
       user_id: req.user.userId,
-      categories: categories || [],
+      categories,
+      shared: validatedShared,
+      attachments,
     });
 
     await note.save();
-
-    // Populate categories for response
     await note.populate("categories", "name color");
+
+    const formattedNote = {
+      id: note._id,
+      title: note.title,
+      body: note.body,
+      color: `#${note.color}`,
+      categories:
+        note.categories?.map((cat) => ({
+          id: cat._id,
+          name: cat.name,
+          color: `#${cat.color}`,
+        })) || [],
+      shared: note.shared,
+      attachments: note.attachments.map((file) => ({
+        id: file._id,
+        filename: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype,
+      })),
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+    };
 
     res.status(201).json({
       success: true,
       message: "Note created successfully",
-      note: {
-        id: note._id,
-        title: note.title,
-        body: note.body,
-        color: `#${note.color}`, // Add # when sending to client
-        categories: note.categories.map((cat) => ({
-          id: cat._id,
-          name: cat.name,
-          color: `#${cat.color}`,
-        })),
-        createdAt: note.createdAt,
-        updatedAt: note.updatedAt,
-      },
+      note: formattedNote,
     });
   } catch (error) {
+    // Clean up uploaded files if note creation fails
+    if (req.files) {
+      await Promise.all(req.files.map((file) => fs.unlink(file.path)));
+    }
     console.error("Note creation error:", error);
     res.status(500).json({
       success: false,
@@ -54,65 +92,104 @@ exports.createNote = async (req, res) => {
 exports.updateNote = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, body, color, categories } = req.body;
     const userId = req.user.userId;
+    const files = req.files;
+
+    // Parse JSON strings from FormData
+    const title = req.body.title;
+    const body = req.body.body;
+    const color = req.body.color;
+    const categories = JSON.parse(req.body.categories || '[]');
+    const shared = JSON.parse(req.body.shared || '[]');
 
     const note = await Note.findOne({
       _id: id,
       $or: [
         { user_id: userId },
-        {
-          sharedWith: {
-            $elemMatch: {
-              user: userId,
-              permission: "edit",
-            },
-          },
-        },
-      ],
+        { shared: { $elemMatch: { id: userId, permission: "edit" } } }
+      ]
     });
 
     if (!note) {
+      // Clean up any uploaded files if note not found
+      if (files) {
+        await Promise.all(files.map(file => fs.unlink(file.path)));
+      }
       return res.status(404).json({
         success: false,
-        errors: {
-          note: "Note not found or access denied",
-        },
+        errors: { note: "Note not found or access denied" }
       });
     }
 
+    // Update basic fields
     if (title) note.title = title;
     if (body) note.body = body;
     if (color) note.color = color.replace("#", "");
     if (categories) note.categories = categories;
 
+    // Update shared users if provided
+    if (shared) {
+      const validatedShared = shared
+        .filter(share => share.id !== userId)
+        .map(share => ({
+          id: share.id,
+          username: share.username,
+          permission: share.permission
+        }));
+      note.shared = validatedShared;
+    }
+
+    // Add new files if any
+    if (files && files.length > 0) {
+      const newAttachments = files.map(file => ({
+        filename: file.filename,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        path: file.path
+      }));
+      note.attachments.push(...newAttachments);
+    }
+
     await note.save();
     await note.populate("categories", "name color");
+
+    // Format the response
+    const formattedNote = {
+      id: note._id,
+      title: note.title,
+      body: note.body,
+      color: `#${note.color}`,
+      categories: note.categories?.map(cat => ({
+        id: cat._id,
+        name: cat.name,
+        color: `#${cat.color}`
+      })) || [],
+      shared: note.shared,
+      attachments: note.attachments.map(file => ({
+        filename: file.filename,
+        originalname: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype
+      })),
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt
+    };
 
     res.json({
       success: true,
       message: "Note updated successfully",
-      note: {
-        id: note._id,
-        title: note.title,
-        body: note.body,
-        color: `#${note.color}`, // Add # when sending to client
-        categories: note.categories.map((cat) => ({
-          id: cat._id,
-          name: cat.name,
-          color: `#${cat.color}`,
-        })),
-        createdAt: note.createdAt,
-        updatedAt: note.updatedAt,
-      },
+      note: formattedNote
     });
   } catch (error) {
+    // Clean up any uploaded files if there's an error
+    if (req.files) {
+      await Promise.all(req.files.map(file => fs.unlink(file.path)));
+    }
     console.error("Note update error:", error);
     res.status(500).json({
       success: false,
-      errors: {
-        server: "Error updating note",
-      },
+      errors: { server: "Error updating note" }
     });
   }
 };
@@ -520,6 +597,66 @@ exports.removeAttachment = async (req, res) => {
       errors: {
         server: "Error removing file",
       },
+    });
+  }
+};
+
+exports.deleteAttachment = async (req, res) => {
+  try {
+    const { noteId, filename } = req.params;
+    const userId = req.user.userId;
+
+    const note = await Note.findOne({
+      _id: noteId,
+      $or: [
+        { user_id: userId },
+        { shared: { $elemMatch: { id: userId, permission: "edit" } } },
+      ],
+    });
+
+    if (!note) {
+      return res.status(404).json({
+        success: false,
+        errors: { note: "Note not found or access denied" },
+      });
+    }
+
+    // Find attachment by filename
+    const attachmentIndex = note.attachments.findIndex(
+      (att) => att.filename === filename
+    );
+
+    if (attachmentIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        errors: { attachment: "Attachment not found" },
+      });
+    }
+
+    // Construct file path using __dirname, userId, and filename
+    const filePath = path.join(__dirname, "../../uploads", userId, filename);
+
+    // Remove the file from storage
+    try {
+      await fs.unlink(filePath);
+    } catch (unlinkError) {
+      console.error("Error deleting file:", unlinkError);
+      // Continue with removing from database even if file deletion fails
+    }
+
+    // Remove from attachments array
+    note.attachments.splice(attachmentIndex, 1);
+    await note.save();
+
+    res.json({
+      success: true,
+      message: "Attachment deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete attachment error:", error);
+    res.status(500).json({
+      success: false,
+      errors: { server: "Error deleting attachment" },
     });
   }
 };

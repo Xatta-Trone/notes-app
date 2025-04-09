@@ -6,5 +6,5 @@ export const NOTE_COLORS = [
   { value: '#60a5fa', label: 'Blue' },
   { value: '#a78bfa', label: 'Purple' },
   { value: '#f472b6', label: 'Pink' },
-  { value: '#ffffff', label: 'White' },
+  { value: '#8e44ad', label: 'Wisteria' },
 ];

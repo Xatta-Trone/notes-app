@@ -24,7 +24,9 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(
+    null
+  );
 
   useEffect(() => {
     fetchCategories();
@@ -32,15 +34,18 @@ export default function CategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      const { data } = await api.get('/categories');
+      const { data } = await api.get("/categories");
       setCategories(data.categories);
     } catch (err) {
       console.error("Fetch categories error:", err);
       if (err instanceof AxiosError) {
         const error = err as AxiosError<ApiErrorResponse>;
-        toast.error(error.response?.data?.message || "Failed to load categories", {
-          style: { background: "#dc2626", color: "white" }
-        });
+        toast.error(
+          error.response?.data?.message || "Failed to load categories",
+          {
+            style: { background: "#dc2626", color: "white" },
+          }
+        );
       }
     } finally {
       setLoading(false);
@@ -58,9 +63,12 @@ export default function CategoriesPage() {
       console.error("Delete category error:", err);
       if (err instanceof AxiosError) {
         const error = err as AxiosError<ApiErrorResponse>;
-        toast.error(error.response?.data?.message || "Failed to delete category", {
-          style: { background: "#dc2626", color: "white" }
-        });
+        toast.error(
+          error.response?.data?.message || "Failed to delete category",
+          {
+            style: { background: "#dc2626", color: "white" },
+          }
+        );
       }
     }
   };
